@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="description" content="FreeFire Hotel - Seller Panel for managing orders, menu, payments, and dine-in bookings." />
+  <meta name="theme-color" content="#1C1C1E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>FreeFire Hotel - Seller Panel</title>
+
+  <!-- DNS prefetch & preconnect for faster font loading -->
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Preload critical assets -->
+  <link rel="preload" href="/images/logo.jpg" as="image" />
+
+  <!-- Google Fonts with display=swap (non-blocking) -->
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+
+  <!-- Inline critical CSS for instant loading state -->
+  <style>
+    body { margin: 0; font-family: Inter, system-ui, -apple-system, sans-serif; background: #1C1C1E; }
+    #root:empty { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    #root:empty::after {
+      content: '';
+      width: 32px; height: 32px;
+      border: 3px solid rgba(249,115,22,0.2);
+      border-top-color: #f97316;
+      border-radius: 50%;
+      animation: _spin 0.6s linear infinite;
+    }
+    @keyframes _spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="font-sans antialiased">
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
+

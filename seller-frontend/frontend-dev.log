@@ -1,0 +1,10 @@
+
+> biryani-seller-frontend@1.0.0 dev
+> vite --host 0.0.0.0 --port 3001 --strictPort
+
+
+  VITE v6.4.3  ready in 1737 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: http://10.69.115.86:3001/
+  ➜  press h + enter to show help
