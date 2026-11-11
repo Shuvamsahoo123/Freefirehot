@@ -8,10 +8,12 @@ export default function ShopAvailabilityCard() {
   const [customClosureMessage, setCustomClosureMessage] = useState('');
   const [closureType, setClosureType] = useState('end_of_day');
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const isShopOpen = storeSettings?.isShopOpen ?? true;
 
   const handleToggle = async () => {
+    setErrorMessage('');
     if (isShopOpen) {
       setShowModal(true);
     } else {
@@ -20,6 +22,7 @@ export default function ShopAvailabilityCard() {
         await updateStoreSettings({ isShopOpen: true });
       } catch (error) {
         console.error(error);
+        setErrorMessage(error.message || 'Could not reopen the shop. Check the backend connection and try again.');
       } finally {
         setIsLoading(false);
       }
@@ -28,6 +31,7 @@ export default function ShopAvailabilityCard() {
 
   const handleCloseShop = async () => {
     setIsLoading(true);
+    setErrorMessage('');
     try {
       await updateStoreSettings({
         isShopOpen: false,
@@ -38,6 +42,7 @@ export default function ShopAvailabilityCard() {
       setShowModal(false);
     } catch (error) {
       console.error(error);
+      setErrorMessage(error.message || 'Could not save shop availability. Check the backend connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -80,10 +85,22 @@ export default function ShopAvailabilityCard() {
         </button>
       </div>
 
+      {errorMessage && !showModal && (
+        <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorMessage}
+        </p>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-xl font-bold text-neutral-800 mb-4">Close Shop</h3>
+
+            {errorMessage && (
+              <p role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorMessage}
+              </p>
+            )}
             
             <div className="mb-4">
               <label className="block text-sm font-medium text-neutral-700 mb-2">Select Reason</label>

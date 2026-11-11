@@ -8,3 +8,4 @@
   ➜  Local:   http://localhost:3001/
   ➜  Network: http://10.69.115.86:3001/
   ➜  press h + enter to show help
+11:26:05 pm [vite] (client) hmr update /src/components/ShopAvailabilityCard.jsx, /src/index.css
