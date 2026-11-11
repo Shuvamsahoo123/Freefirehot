@@ -4,7 +4,7 @@
 // Centralised API layer for communicating with the Seller Backend.
 // All Cloudinary interactions go through the backend — never from the browser.
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/seller';
+VITE_API_URL=https://freefirehot-mvcu.vercel.app
 
 function getAuthHeaders() {
   const token = window.sessionStorage.getItem('sellerToken');
