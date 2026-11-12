@@ -10,6 +10,12 @@ import {
 
 const AppContext = createContext(null);
 
+const getMenuItemId = (item) => item?._id ?? item?.id;
+const normalizeMenuItem = (item) => {
+  const id = getMenuItemId(item);
+  return id == null ? item : { ...item, id: String(id) };
+};
+
 export function AppProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -170,7 +176,7 @@ export function AppProvider({ children }) {
     async function loadMenu() {
       try {
         const data = await fetchMenuItems();
-        setMenuItems(data);
+        setMenuItems((data || []).map(normalizeMenuItem));
       } catch (err) {
         console.error("Failed to load menu items", err);
       }
@@ -181,8 +187,9 @@ export function AppProvider({ children }) {
   const addMenuItem = useCallback(async (item) => {
     try {
       const savedItem = await createMenuItemAPI(item);
-      setMenuItems((prev) => [savedItem, ...prev]);
-      return savedItem;
+      const normalizedItem = normalizeMenuItem(savedItem);
+      setMenuItems((prev) => [normalizedItem, ...prev]);
+      return normalizedItem;
     } catch (err) {
       console.error("Failed to create menu item", err);
       throw err;
@@ -191,13 +198,13 @@ export function AppProvider({ children }) {
 
   const updateMenuItem = useCallback(async (itemId, updates) => {
     try {
-      // Find MongoDB _id if frontend passes local id
-      const itemToUpdate = menuItems.find(i => i.id === itemId || i._id === itemId);
-      const dbId = itemToUpdate?._id || itemId;
-      const updatedItem = await updateMenuItemAPI(dbId, updates);
+      const itemToUpdate = menuItems.find((item) => String(getMenuItemId(item)) === String(itemId));
+      if (!itemToUpdate) throw new Error('Menu item not found. Refresh the page and try again.');
+      const dbId = getMenuItemId(itemToUpdate);
+      const updatedItem = normalizeMenuItem(await updateMenuItemAPI(dbId, updates));
       
       setMenuItems((prev) =>
-        prev.map((item) => (item._id === dbId || item.id === itemId ? updatedItem : item))
+        prev.map((item) => String(getMenuItemId(item)) === String(dbId) ? updatedItem : item)
       );
     } catch (err) {
       console.error("Failed to update menu item", err);
@@ -207,11 +214,12 @@ export function AppProvider({ children }) {
 
   const deleteMenuItem = useCallback(async (itemId) => {
     try {
-      const itemToDelete = menuItems.find(i => i.id === itemId || i._id === itemId);
-      const dbId = itemToDelete?._id || itemId;
+      const itemToDelete = menuItems.find((item) => String(getMenuItemId(item)) === String(itemId));
+      if (!itemToDelete) throw new Error('Menu item not found. Refresh the page and try again.');
+      const dbId = getMenuItemId(itemToDelete);
       await deleteMenuItemAPI(dbId);
       
-      setMenuItems((prev) => prev.filter((item) => item.id !== itemId && item._id !== dbId));
+      setMenuItems((prev) => prev.filter((item) => String(getMenuItemId(item)) !== String(dbId)));
     } catch (err) {
       console.error("Failed to delete menu item", err);
       throw err;
@@ -223,6 +231,7 @@ export function AppProvider({ children }) {
       await updateMenuItem(itemId, { dailyQty: newQty });
     } catch (err) {
       console.error("Failed to restock menu item", err);
+      throw err;
     }
   }, [updateMenuItem]);
 

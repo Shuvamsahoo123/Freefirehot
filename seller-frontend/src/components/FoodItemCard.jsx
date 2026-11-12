@@ -14,13 +14,17 @@ export default function FoodItemCard({ item, onToggleStatus }) {
   const isLowStock = item.remaining > 0 && item.remaining <= 5;
   const isSoldOut = item.remaining <= 0;
 
-  const handleRestock = () => {
+  const handleRestock = async () => {
     const qty = Number(addedQty);
     if (qty > 0 && Number.isInteger(qty)) {
       const newDailyQty = item.dailyQty + qty;
-      restockMenuItem(item.id, newDailyQty);
-      setShowRestock(false);
-      setAddedQty('');
+      try {
+        await restockMenuItem(item._id || item.id, newDailyQty);
+        setShowRestock(false);
+        setAddedQty('');
+      } catch (error) {
+        window.alert(error.message || 'Could not restock this item. Please try again.');
+      }
     }
   };
 
@@ -28,7 +32,7 @@ export default function FoodItemCard({ item, onToggleStatus }) {
     if (!window.confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
 
     try {
-      await deleteMenuItem(item.id || item._id);
+      await deleteMenuItem(item._id || item.id);
     } catch (error) {
       window.alert(error.message || 'Could not delete this menu item. Please try again.');
     }
@@ -70,7 +74,7 @@ export default function FoodItemCard({ item, onToggleStatus }) {
               <p className="text-base font-extrabold text-gray-900 mt-0.5">₹{item.price}</p>
             </div>
             <button
-              onClick={() => navigate(`/menu/edit/${item.id}`)}
+              onClick={() => navigate(`/menu/edit/${item._id || item.id}`)}
               className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors"
             >
               <Pencil size={14} className="text-gray-500" />
@@ -113,7 +117,7 @@ export default function FoodItemCard({ item, onToggleStatus }) {
       {/* Quick Actions */}
       <div className="flex border-t border-gray-100">
         <button
-          onClick={() => navigate(`/menu/edit/${item.id}`)}
+          onClick={() => navigate(`/menu/edit/${item._id || item.id}`)}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
         >
           <Pencil size={13} />

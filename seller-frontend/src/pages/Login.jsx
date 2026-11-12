@@ -52,7 +52,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <div className="min-h-screen bg-dark flex flex-col items-center justify-center px-6 relative overflow-hidden safe-screen">
       {/* Background image with blend */}
       <div className="absolute inset-0 z-0">
         <img src="/images/dashboard-bg.jpg" alt="" className="w-full h-full object-cover opacity-30" loading="eager" decoding="async" fetchPriority="low" />

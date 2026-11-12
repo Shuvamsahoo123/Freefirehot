@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronLeft, MoreVertical } from 'lucide-react';
 import { useApp } from '../context/AppContext';
+import PWAInstallButton from './PWAInstall';
 
 // Page title mapping
 const pageTitles = {
@@ -67,6 +68,7 @@ export default function Header() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <PWAInstallButton />
           {!isOrderDetail && (
             <button
               onClick={() => navigate('/notifications')}

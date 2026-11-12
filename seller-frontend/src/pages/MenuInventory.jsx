@@ -42,9 +42,9 @@ export default function MenuInventory() {
       <div className="space-y-3 stagger-children">
         {menuItems.map((item) => (
           <FoodItemCard
-            key={item.id}
+            key={item._id || item.id}
             item={item}
-            onToggleStatus={() => handleToggleStatus(item.id, item.status)}
+            onToggleStatus={() => handleToggleStatus(item._id || item.id, item.status)}
           />
         ))}
       </div>

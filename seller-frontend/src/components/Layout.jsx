@@ -30,7 +30,7 @@ export default function Layout() {
         <Header />
 
         {/* Page content with bottom padding for mobile nav */}
-        <main className="flex-1 pb-20 lg:pb-6">
+        <main className="flex-1 pb-20 lg:pb-6 safe-content-bottom">
           <div className="max-w-3xl mx-auto lg:max-w-5xl">
             <Outlet />
           </div>

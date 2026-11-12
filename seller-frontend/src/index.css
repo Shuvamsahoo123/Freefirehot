@@ -15,8 +15,15 @@ html {
 /* Hide scrollbar but keep scroll functionality */
 body {
   overflow-x: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -118,10 +125,33 @@ body {
 .stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
 .stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
 
-/* Safe area padding for mobile devices with notch */
-@supports (padding-bottom: env(safe-area-inset-bottom)) {
-  .safe-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+/* Safe-area padding for installed apps on notched mobile screens. */
+.safe-top {
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+}
+
+@media (min-width: 1024px) {
+  .safe-top {
+    padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  }
+}
+
+.safe-bottom {
+  padding-bottom: calc(0.375rem + env(safe-area-inset-bottom, 0px));
+}
+
+.safe-content-bottom {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.safe-screen {
+  padding-top: max(1.5rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .safe-content-bottom {
+    padding-bottom: 1.5rem;
   }
 }
 
