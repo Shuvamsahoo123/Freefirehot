@@ -15,6 +15,7 @@ import {
   QrCode,
   UploadCloud,
   CheckCircle2,
+  BellRing,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { uploadQrCodeAPI } from '../services/api';
@@ -55,6 +56,11 @@ export default function Settings() {
   const [saved, setSaved] = useState(false);
   const [newHoliday, setNewHoliday] = useState('');
   const [qrUploading, setQrUploading] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(() =>
+    typeof window !== 'undefined' && 'Notification' in window
+      ? Notification.permission
+      : 'unsupported'
+  );
 
   useEffect(() => {
     setSettings(normalizeSettings(storeSettings));
@@ -134,6 +140,18 @@ export default function Settings() {
     }
   };
 
+  const enableOrderNotifications = async () => {
+    if (!('Notification' in window)) {
+      setNotificationPermission('unsupported');
+      return;
+    }
+    try {
+      setNotificationPermission(await Notification.requestPermission());
+    } catch (error) {
+      console.error('Could not request notification permission:', error);
+    }
+  };
+
   const days = Object.keys(settings.openingHours);
 
   return (
@@ -152,6 +170,39 @@ export default function Settings() {
       </div>
 
       <div className="space-y-4">
+        {/* Phone/browser order alerts */}
+        <div className="bg-white rounded-2xl p-4 shadow-card border border-gray-100/80">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 rounded-xl flex items-center justify-center shadow-md">
+                <BellRing size={18} className="text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-900">New Order Alerts</h3>
+                <p className="text-xs text-gray-400">
+                  {notificationPermission === 'granted'
+                    ? 'Enabled on this device'
+                    : notificationPermission === 'denied'
+                      ? 'Blocked. Allow notifications in browser settings.'
+                      : notificationPermission === 'unsupported'
+                        ? 'Notifications are not supported here'
+                        : 'Get a notification when an order arrives'}
+                </p>
+              </div>
+            </div>
+            {notificationPermission === 'granted' ? (
+              <span className="text-xs font-bold text-green-600">Enabled</span>
+            ) : notificationPermission === 'unsupported' || notificationPermission === 'denied' ? null : (
+              <button
+                onClick={enableOrderNotifications}
+                className="flex-shrink-0 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
+              >
+                Enable
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Online Ordering Toggle */}
         <div className="bg-white rounded-2xl p-4 shadow-card border border-gray-100/80">
           <div className="flex items-center justify-between">
