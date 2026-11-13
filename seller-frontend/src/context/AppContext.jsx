@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
 import { fetchMenuItems, createMenuItem as createMenuItemAPI, updateMenuItemAPI, deleteMenuItemAPI, fetchStoreSettings, updateStoreSettingsAPI, fetchAllOrders, verifyPaymentAPI, rejectPaymentAPI, updateOrderStatusAPI, rejectOrderAPI, collectRemainingPaymentAPI, loginSellerAPI, setupSellerAPI, fetchCurrentSellerAPI } from '../services/api';
 import {
   initialOrders,
@@ -24,18 +24,19 @@ export function AppProvider({ children }) {
   const [dineInBookings, setDineInBookings] = useState(initialDineInBookings);
   const [notifications, setNotifications] = useState(initialNotifications);
   const [storeSettings, setStoreSettings] = useState(initialStoreSettings);
-  const hasLoadedOrdersRef = useRef(false);
-  const seenOrderIdsRef = useRef(new Set());
 
   // ========== AUTH ==========
   useEffect(() => {
     async function restoreSession() {
-      if (window.sessionStorage.getItem('sellerToken')) {
+      const token = window.localStorage.getItem('sellerToken') || window.sessionStorage.getItem('sellerToken');
+      if (token) {
+        window.localStorage.setItem('sellerToken', token);
+        window.sessionStorage.removeItem('sellerToken');
         try {
           await fetchCurrentSellerAPI();
           setIsAuthenticated(true);
         } catch {
-          window.sessionStorage.removeItem('sellerToken');
+          window.localStorage.removeItem('sellerToken');
         }
       }
       setAuthReady(true);
@@ -47,13 +48,13 @@ export function AppProvider({ children }) {
     const session = setup
       ? await setupSellerAPI(email, password)
       : await loginSellerAPI(email, password);
-    window.sessionStorage.setItem('sellerToken', session.token);
+    window.localStorage.setItem('sellerToken', session.token);
     setIsAuthenticated(true);
     return session.seller;
   }, []);
 
   const logout = useCallback(() => {
-    window.sessionStorage.removeItem('sellerToken');
+    window.localStorage.removeItem('sellerToken');
     setIsAuthenticated(false);
   }, []);
 
@@ -163,38 +164,6 @@ export function AppProvider({ children }) {
     try {
       const data = await fetchAllOrders();
       const latestOrders = data || [];
-      const currentIds = new Set(latestOrders.map((order) => String(order._id || order.id)).filter(Boolean));
-
-      if (hasLoadedOrdersRef.current && 'Notification' in window && Notification.permission === 'granted') {
-        const newOrders = latestOrders.filter((order) => {
-          const id = String(order._id || order.id || '');
-          return id && !seenOrderIdsRef.current.has(id);
-        });
-
-        newOrders.forEach((order) => {
-          const title = 'New order received';
-          const orderNumber = order.orderId || order._id || order.id;
-          const body = `Order #${orderNumber} is waiting for your review.`;
-          const options = {
-            body,
-            icon: '/pwa-192x192.png',
-            badge: '/pwa-192x192.png',
-            tag: `new-order-${order._id || order.id}`,
-            data: { url: `/orders/${order._id || order.id}` },
-          };
-
-          if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.ready
-              .then((registration) => registration.showNotification(title, options))
-              .catch((error) => console.error('Could not show order notification:', error));
-          } else {
-            new Notification(title, options);
-          }
-        });
-      }
-
-      seenOrderIdsRef.current = currentIds;
-      hasLoadedOrdersRef.current = true;
       setOrders(latestOrders);
     } catch (err) {
       // Keep the last successfully loaded orders visible during temporary outages.

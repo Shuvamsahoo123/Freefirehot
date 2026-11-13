@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-const TOKEN_LIFETIME_SECONDS = 60 * 60 * 12;
+// Keep sellers signed in across PWA/browser restarts while still expiring old sessions.
+const TOKEN_LIFETIME_SECONDS = 60 * 60 * 24 * 30;
 
 function getSecret() {
   const secret = process.env.JWT_SECRET;

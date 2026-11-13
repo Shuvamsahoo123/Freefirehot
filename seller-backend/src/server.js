@@ -9,6 +9,9 @@ import { connectDB } from './config/database.js';
 import { verifyCloudinaryConfig } from './config/cloudinary.js';
 import menuItemRoutes from './routes/menuItemRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import pushRoutes from './routes/pushRoutes.js';
+import Order from './models/Order.js';
+import { sendNewOrderPush } from './services/orderPush.js';
 import { authenticateSeller } from './middleware/auth.js';
 import dns from 'node:dns';
 
@@ -65,6 +68,7 @@ app.get('/api/health', (req, res) => {
 // Authentication and first-account setup stay public; all seller APIs require a signed token.
 app.use('/api/seller/auth', authRoutes);
 app.use('/api/seller', authenticateSeller);
+app.use('/api/seller/push', pushRoutes);
 
 import storeSettingsRoutes from './routes/storeSettingsRoutes.js';
 import orderRoutes from './routes/orderRoutes.js';
@@ -123,6 +127,32 @@ app.use((err, req, res, _next) => {
 
 // ========== STARTUP ==========
 
+let orderChangeStream;
+let orderChangeStreamRetry;
+
+function watchForNewOrders() {
+  if (orderChangeStreamRetry) clearTimeout(orderChangeStreamRetry);
+  try {
+    orderChangeStream = Order.watch([], { fullDocument: 'updateLookup' });
+    orderChangeStream.on('change', (change) => {
+      if (change.operationType === 'insert' && change.fullDocument) {
+        sendNewOrderPush(change.fullDocument).catch((error) => {
+          console.error('Could not notify devices about new order:', error.message);
+        });
+      }
+    });
+    orderChangeStream.on('error', (error) => {
+      console.error('Order notification stream error:', error.message);
+      orderChangeStreamRetry = setTimeout(watchForNewOrders, 5000);
+      orderChangeStreamRetry.unref?.();
+    });
+  } catch (error) {
+    console.error('Could not start order notification stream:', error.message);
+    orderChangeStreamRetry = setTimeout(watchForNewOrders, 5000);
+    orderChangeStreamRetry.unref?.();
+  }
+}
+
 async function startServer() {
   try {
     // Verify Cloudinary configuration
@@ -130,6 +160,7 @@ async function startServer() {
 
     // Connect to MongoDB
     await connectDB();
+    watchForNewOrders();
 
     // Start the server
     app.listen(PORT, () => {

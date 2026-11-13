@@ -7,7 +7,7 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://freefirehot-mvcu.vercel.app';
 
 function getAuthHeaders() {
-  const token = window.sessionStorage.getItem('sellerToken');
+  const token = window.localStorage.getItem('sellerToken');
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
@@ -198,6 +198,18 @@ export async function fetchPendingPayments() {
 export async function fetchAllOrders() {
   const result = await apiFetch('/orders');
   return result.data;
+}
+
+export async function fetchPushPublicKeyAPI() {
+  const result = await apiFetch('/push/public-key');
+  return result.data.publicKey;
+}
+
+export async function savePushSubscriptionAPI(subscription) {
+  return apiFetch('/push/subscription', {
+    method: 'POST',
+    body: JSON.stringify({ subscription }),
+  });
 }
 
 export async function fetchOrderDetails(id) {

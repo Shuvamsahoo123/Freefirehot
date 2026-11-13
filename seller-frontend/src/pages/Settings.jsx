@@ -18,7 +18,7 @@ import {
   BellRing,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { uploadQrCodeAPI } from '../services/api';
+import { uploadQrCodeAPI, fetchPushPublicKeyAPI, savePushSubscriptionAPI } from '../services/api';
 import { initialStoreSettings } from '../data/mockData';
 
 function normalizeSettings(value = {}) {
@@ -50,6 +50,13 @@ function normalizeSettings(value = {}) {
   };
 }
 
+function decodeApplicationServerKey(base64UrlKey) {
+  const padding = '='.repeat((4 - (base64UrlKey.length % 4)) % 4);
+  const base64 = `${base64UrlKey.replace(/-/g, '+').replace(/_/g, '/')}${padding}`;
+  const raw = window.atob(base64);
+  return Uint8Array.from(raw, (character) => character.charCodeAt(0));
+}
+
 export default function Settings() {
   const { storeSettings, updateStoreSettings } = useApp();
   const [settings, setSettings] = useState(() => normalizeSettings(storeSettings));
@@ -61,6 +68,8 @@ export default function Settings() {
       ? Notification.permission
       : 'unsupported'
   );
+  const [notificationsConnected, setNotificationsConnected] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
 
   useEffect(() => {
     setSettings(normalizeSettings(storeSettings));
@@ -141,14 +150,30 @@ export default function Settings() {
   };
 
   const enableOrderNotifications = async () => {
-    if (!('Notification' in window)) {
+    setNotificationError('');
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
       setNotificationPermission('unsupported');
       return;
     }
     try {
-      setNotificationPermission(await Notification.requestPermission());
+      const permission = Notification.permission === 'default'
+        ? await Notification.requestPermission()
+        : Notification.permission;
+      setNotificationPermission(permission);
+      if (permission !== 'granted') return;
+
+      const registration = await navigator.serviceWorker.ready;
+      const applicationServerKey = await fetchPushPublicKeyAPI();
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription || await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: decodeApplicationServerKey(applicationServerKey),
+      });
+      await savePushSubscriptionAPI(subscription.toJSON());
+      setNotificationsConnected(true);
     } catch (error) {
       console.error('Could not request notification permission:', error);
+      setNotificationError(error.message || 'Could not connect this phone for order notifications.');
     }
   };
 
@@ -180,24 +205,27 @@ export default function Settings() {
               <div>
                 <h3 className="text-sm font-bold text-gray-900">New Order Alerts</h3>
                 <p className="text-xs text-gray-400">
-                  {notificationPermission === 'granted'
-                    ? 'Enabled on this device'
+                  {notificationsConnected
+                    ? 'This phone will receive new-order alerts, even when the app is closed.'
                     : notificationPermission === 'denied'
                       ? 'Blocked. Allow notifications in browser settings.'
                       : notificationPermission === 'unsupported'
                         ? 'Notifications are not supported here'
-                        : 'Get a notification when an order arrives'}
+                        : notificationPermission === 'granted'
+                          ? 'Finish connecting this phone for order alerts'
+                          : 'Get a notification when an order arrives'}
                 </p>
+                {notificationError && <p className="mt-1 text-xs text-red-600">{notificationError}</p>}
               </div>
             </div>
-            {notificationPermission === 'granted' ? (
+            {notificationsConnected ? (
               <span className="text-xs font-bold text-green-600">Enabled</span>
             ) : notificationPermission === 'unsupported' || notificationPermission === 'denied' ? null : (
               <button
                 onClick={enableOrderNotifications}
                 className="flex-shrink-0 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white hover:bg-orange-600"
               >
-                Enable
+                {notificationPermission === 'granted' ? 'Connect this phone' : 'Enable'}
               </button>
             )}
           </div>
