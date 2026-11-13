@@ -2,6 +2,76 @@ import Order from '../models/Order.js';
 import MenuItem from '../models/MenuItem.js';
 import mongoose from 'mongoose';
 
+const PAYMENT_CONTAINER_KEYS = [
+  'payment', 'paymentDetails', 'paymentInfo', 'advancePayment',
+  'advancePaymentDetails', 'upiPayment', 'paymentProof', 'payment_proof',
+];
+const UTR_KEYS = [
+  'upiTransactionId', 'upi_transaction_id', 'upiTransactionID',
+  'utrNumber', 'utr_number', 'utrNo', 'utr_no', 'utr',
+  'transactionId', 'transaction_id', 'transactionID', 'txnId', 'txn_id',
+  'referenceNumber', 'reference_number', 'paymentReference', 'payment_reference',
+];
+const SCREENSHOT_KEYS = [
+  'paymentScreenshot', 'payment_screenshot', 'paymentScreenshotUrl',
+  'payment_screenshot_url', 'screenshot', 'screenshotUrl', 'screenshot_url',
+  'receipt', 'paymentProof', 'payment_proof', 'utrImage', 'utr_image',
+  'paymentImage', 'payment_image', 'proofImage', 'proof_image',
+];
+
+function getPaymentContainers(order) {
+  return PAYMENT_CONTAINER_KEYS.flatMap((key) => {
+    const value = order?.[key];
+    if (Array.isArray(value)) return value.filter((entry) => entry && typeof entry === 'object');
+    return value && typeof value === 'object' ? [value] : [];
+  });
+}
+
+function getOrderTransactionId(order) {
+  for (const source of [order, ...getPaymentContainers(order)]) {
+    for (const key of UTR_KEYS) {
+      const value = source?.[key];
+      if (typeof value === 'string' && value.trim()) return value.trim();
+      if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+    }
+  }
+  return null;
+}
+
+function extractScreenshotUrl(value, depth = 0) {
+  if (depth > 5 || value == null) return null;
+  if (typeof value === 'string') return value.trim() || null;
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const url = extractScreenshotUrl(entry, depth + 1);
+      if (url) return url;
+    }
+    return null;
+  }
+  if (typeof value !== 'object') return null;
+
+  for (const key of ['url', 'secure_url', 'secureUrl', 'imageUrl', 'image_url', 'src', 'path', 'location', 'downloadUrl', 'downloadURL', 'link']) {
+    const url = value[key];
+    if (typeof url === 'string' && url.trim()) return url.trim();
+  }
+  for (const key of ['image', 'screenshot', 'receipt', 'proof', 'file', 'data', 'result']) {
+    const url = extractScreenshotUrl(value[key], depth + 1);
+    if (url) return url;
+  }
+  return null;
+}
+
+function getOrderPaymentScreenshot(order) {
+  const containers = getPaymentContainers(order);
+  for (const source of [order, ...containers]) {
+    for (const key of SCREENSHOT_KEYS) {
+      const url = extractScreenshotUrl(source?.[key]);
+      if (url) return url;
+    }
+  }
+  return null;
+}
+
 const mapOrderForFrontend = (orderDoc) => {
   const obj = orderDoc.toObject();
   if (obj.paymentStatus === 'PENDING_VERIFICATION' || obj.paymentStatus === 'VERIFICATION_PENDING') obj.paymentStatus = 'verification_pending';
@@ -24,17 +94,8 @@ const mapOrderForFrontend = (orderDoc) => {
   if (obj.orderType && obj.orderType.toLowerCase() === 'pickup') obj.orderType = 'Pickup';
   if (obj.orderType && obj.orderType.toLowerCase() === 'dine-in') obj.orderType = 'Dine-In';
 
-  // Flexible UTR and Screenshot mapping
-  obj.upiTransactionId = obj.upiTransactionId || obj.utrNumber || obj.utr || obj.transactionId || null;
-  
-  const rawScreenshot = obj.paymentScreenshot || obj.screenshot || obj.receipt || obj.paymentProof || obj.image || obj.utrImage || obj.paymentImage || obj.screenshotUrl || obj.paymentScreenshotUrl;
-  if (typeof rawScreenshot === 'object' && rawScreenshot !== null) {
-    obj.paymentScreenshot = rawScreenshot.url || rawScreenshot.secure_url || rawScreenshot.imageUrl || rawScreenshot.src || rawScreenshot.image?.url || null;
-  } else if (typeof rawScreenshot === 'string') {
-    obj.paymentScreenshot = rawScreenshot;
-  } else {
-    obj.paymentScreenshot = null;
-  }
+  obj.upiTransactionId = getOrderTransactionId(obj);
+  obj.paymentScreenshot = getOrderPaymentScreenshot(obj);
 
   return obj;
 };
@@ -73,11 +134,9 @@ export async function verifyPayment(req, res) {
       return res.status(404).json({ success: false, message: 'Order not found.' });
     }
 
+    const orderData = order.toObject();
     const paymentProofExists = Boolean(
-      order.upiTransactionId || order.utrNumber || order.utr || order.transactionId ||
-      order.paymentScreenshot?.url || order.paymentScreenshot || order.screenshot ||
-      order.receipt || order.paymentProof || order.paymentImage || order.screenshotUrl ||
-      order.paymentScreenshotUrl
+      getOrderTransactionId(orderData) || getOrderPaymentScreenshot(orderData)
     );
     const canVerify = ['verification_pending', 'VERIFICATION_PENDING', 'PENDING_VERIFICATION'].includes(order.paymentStatus) ||
       (['pending', 'PENDING'].includes(order.paymentStatus) && paymentProofExists);
@@ -97,15 +156,7 @@ export async function verifyPayment(req, res) {
 
     const updatedOrder = await order.save();
     
-    const obj = updatedOrder.toObject();
-    if (obj.paymentStatus === 'PENDING_VERIFICATION') obj.paymentStatus = 'verification_pending';
-    if (obj.paymentStatus === 'PENDING') obj.paymentStatus = 'pending';
-    if (obj.paymentStatus === 'VERIFIED') obj.paymentStatus = 'verified';
-    if (obj.orderStatus === 'RECEIVED') obj.orderStatus = 'pending';
-    if (obj.orderStatus === 'CONFIRMED') obj.orderStatus = 'confirmed';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'delivery') obj.orderType = 'Delivery';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'pickup') obj.orderType = 'Pickup';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'dine-in') obj.orderType = 'Dine-In';
+    const obj = mapOrderForFrontend(updatedOrder);
 
     return res.status(200).json({
       success: true,
@@ -146,16 +197,7 @@ export async function rejectPayment(req, res) {
 
     const updatedOrder = await order.save();
     
-    const obj = updatedOrder.toObject();
-    if (obj.paymentStatus === 'PENDING_VERIFICATION') obj.paymentStatus = 'verification_pending';
-    if (obj.paymentStatus === 'PENDING') obj.paymentStatus = 'pending';
-    if (obj.paymentStatus === 'VERIFIED') obj.paymentStatus = 'verified';
-    if (obj.paymentStatus === 'REJECTED') obj.paymentStatus = 'rejected';
-    if (obj.orderStatus === 'RECEIVED') obj.orderStatus = 'pending';
-    if (obj.orderStatus === 'CONFIRMED') obj.orderStatus = 'confirmed';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'delivery') obj.orderType = 'Delivery';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'pickup') obj.orderType = 'Pickup';
-    if (obj.orderType && obj.orderType.toLowerCase() === 'dine-in') obj.orderType = 'Dine-In';
+    const obj = mapOrderForFrontend(updatedOrder);
 
     return res.status(200).json({
       success: true,
@@ -217,22 +259,7 @@ export async function updateOrderStatus(req, res) {
       const updatedOrder = await order.save(session ? { session } : undefined);
       if (session) await session.commitTransaction();
     
-      const obj = updatedOrder.toObject();
-      if (obj.paymentStatus === 'PENDING_VERIFICATION') obj.paymentStatus = 'verification_pending';
-      if (obj.paymentStatus === 'PENDING') obj.paymentStatus = 'pending';
-      if (obj.paymentStatus === 'VERIFIED') obj.paymentStatus = 'verified';
-      if (obj.paymentStatus === 'REJECTED') obj.paymentStatus = 'rejected';
-      if (obj.orderStatus === 'RECEIVED') obj.orderStatus = 'pending';
-      if (obj.orderStatus === 'CONFIRMED') obj.orderStatus = 'confirmed';
-      if (obj.orderStatus === 'ACCEPTED') obj.orderStatus = 'accepted';
-      if (obj.orderStatus === 'PREPARING') obj.orderStatus = 'preparing';
-      if (obj.orderStatus === 'READY') obj.orderStatus = 'ready';
-      if (obj.orderStatus === 'OUT-FOR-DELIVERY') obj.orderStatus = 'out-for-delivery';
-      if (obj.orderStatus === 'COMPLETED') obj.orderStatus = 'completed';
-      if (obj.orderStatus === 'CANCELLED') obj.orderStatus = 'cancelled';
-      if (obj.orderType && obj.orderType.toLowerCase() === 'delivery') obj.orderType = 'Delivery';
-      if (obj.orderType && obj.orderType.toLowerCase() === 'pickup') obj.orderType = 'Pickup';
-      if (obj.orderType && obj.orderType.toLowerCase() === 'dine-in') obj.orderType = 'Dine-In';
+      const obj = mapOrderForFrontend(updatedOrder);
 
       return res.status(200).json({ success: true, data: obj });
     } catch (error) {
